@@ -1,0 +1,19 @@
+[
+    {   
+        "name": "send_email",
+        "description": "Envia correo electrónico o email",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "email_user": {
+                    "type": "string",
+                    "description": "Email de persona a la que se le envía el correo electrónico"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "Mensaje a enviar"
+                }
+            }
+        }
+    }
+]
