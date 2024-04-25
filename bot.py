@@ -1,31 +1,46 @@
-from os import getenv 
-from telegram import Update
-from telegram.ext import Application, ContextTypes, MessageHandler, filters
+import os
 import json
-from openai import OpenAI
+import requests
+from telegram import Update
+from telegram.ext import Application, MessageHandler, filters, CallbackContext
 from dotenv import load_dotenv
+from openai import OpenAI
 
-
+# Carga las variables de entorno y demás
 load_dotenv()
-mi_api_token = getenv(key='API_TOKEN')
-mi_api_key = getenv(key='API_KEY_OPENAI')
+mi_bot_token = os.getenv('BOT_TOKEN')
+mi_api_key = os.getenv('API_KEY_OPENAI')
 cliente = OpenAI(api_key=mi_api_key)
+mensaje_correcto = True
 
-
-with open(file="functions.json") as file:
+# Carga el fichero JSON
+with open("functions.json", "r") as file:
     fichero_json = json.load(file)
 
+# Funciones
+async def send_message(chat_id: int, text: str) -> None:
+    data = {'chat_id': chat_id, 'text': text}
+    url = f"https://api.telegram.org/bot{mi_bot_token}/sendMessage"
+    response = requests.post(url=url, data=data)
+    if response.ok:
+        print("Mensaje enviado correctamente")
+    else:
+        print("Ha habido un error al enviar")
 
-async def analyze_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+async def analyze_message(update: Update, context: CallbackContext) -> None:
     texto_recibido = update.effective_message.text
-    choose_function(texto=texto_recibido)
+    chat_id = update.effective_chat.id
+    success = choose_function(texto_recibido, chat_id)
+    if success == False:
+        await send_message(chat_id=chat_id, text="Se ha producido un error")
 
 
-def send_email(email_user : str, message : str) -> None:
+def send_email(email_user: str, message: str) -> None:
     print(f'{message} mandando correctamente a {email_user}')
 
 
-def choose_function(texto: str):
+def choose_function(texto : str, chat_id : int) -> bool | None:
     response = cliente.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{'role' : 'user', 
@@ -35,19 +50,20 @@ def choose_function(texto: str):
     )
 
     opcion = response.choices[0].message.function_call
-    funcion_elegida = opcion.name
-    parametros_funcion = json.loads(opcion.arguments)
-    match(funcion_elegida):
-        case "send_email":
-            send_email(email_user=parametros_funcion["email_user"] ,
-                       message=parametros_funcion["message"])
+    if opcion:
+        funcion_elegida = opcion.name
+        parametros_funcion = json.loads(opcion.arguments)
+        match(funcion_elegida):
+            case "send_email":
+                send_email(email_user=parametros_funcion["email_user"] ,
+                           message=parametros_funcion["message"])
+    else:
+        mensaje_correcto = False
+        return mensaje_correcto
 
-def run() -> None:
-    application = Application.builder().token(token=mi_api_token).build()
-    start_handler = MessageHandler(filters=filters.TEXT, callback=analyze_message)
-    application.add_handler(handler = start_handler)
-    application.run_polling()
-
-
+# Configuración del Application
 if __name__ == '__main__':
-   run() 
+    app = Application.builder().token(mi_bot_token).build()
+    text_handler = MessageHandler(filters.TEXT, analyze_message)
+    app.add_handler(text_handler)
+    app.run_polling() # Es como el idle()
