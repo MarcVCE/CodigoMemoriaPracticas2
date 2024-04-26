@@ -1,6 +1,9 @@
 import os
 import json
 import requests
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, CallbackContext
 from dotenv import load_dotenv
@@ -18,12 +21,12 @@ with open("functions.json", "r") as file:
     fichero_json = json.load(file)
 
 # Funciones
-async def send_message(chat_id: int, text: str) -> None:
+def send_message(chat_id: int, text: str) -> None:
     data = {'chat_id': chat_id, 'text': text}
     url = f"https://api.telegram.org/bot{mi_bot_token}/sendMessage"
     response = requests.post(url=url, data=data)
     if response.ok:
-        print("Mensaje enviado correctamente")
+        print("Mensaje de telegram enviado correctamente")
     else:
         print("Ha habido un error al enviar")
 
@@ -31,13 +34,36 @@ async def send_message(chat_id: int, text: str) -> None:
 async def analyze_message(update: Update, context: CallbackContext) -> None:
     texto_recibido = update.effective_message.text
     chat_id = update.effective_chat.id
-    success = choose_function(texto_recibido, chat_id)
-    if success == False:
-        await send_message(chat_id=chat_id, text="Se ha producido un error")
+    success = choose_function(texto=texto_recibido, chat_id=chat_id)
+    if success:
+        send_message(chat_id=chat_id, text="✅ Mensaje enviado correctamente")
+    else:
+        send_message(chat_id=chat_id, text="❌ Se ha producido un error")
 
+def send_email(email_user: str, message_text: str) -> None:
+    smtp_host = 'smtp-mail.outlook.com'
+    smtp_port = 587
+    smtp_user = "superasistenteia0012@outlook.es"
+    smtp_password = "1234567890W@#"
+    message = MIMEMultipart()
+    message["From"] = f"AIbot <{smtp_user}>"
+    message["To"] = email_user
+    message["Subject"] = "Ha recibido un nuevo mensaje"
+    body = message_text
+    message.attach(payload=MIMEText(body, "plain"))
+    try:
+        server = smtplib.SMTP(host=smtp_host, port=smtp_port)
+        server.starttls()
+        server.login(user=smtp_user, password=smtp_password)
+        server.sendmail(from_addr=smtp_user, to_addrs=email_user, msg=message.as_string())
+        print(f'{message_text} mandando correctamente a {email_user}')
+        server.quit()
+        return True
+    except Exception as ex:
+        print(f"Error al enviar el correo electrónico : {ex}")
+        server.quit()
+        return False
 
-def send_email(email_user: str, message: str) -> None:
-    print(f'{message} mandando correctamente a {email_user}')
 
 
 def choose_function(texto : str, chat_id : int) -> bool | None:
@@ -52,18 +78,19 @@ def choose_function(texto : str, chat_id : int) -> bool | None:
     opcion = response.choices[0].message.function_call
     if opcion:
         funcion_elegida = opcion.name
-        parametros_funcion = json.loads(opcion.arguments)
+        parametros_funcion = json.loads(s=opcion.arguments)
         match(funcion_elegida):
             case "send_email":
-                send_email(email_user=parametros_funcion["email_user"] ,
-                           message=parametros_funcion["message"])
+                success = send_email(email_user=parametros_funcion["email_user"] ,
+                           message_text=parametros_funcion["message"])
+        return success
     else:
         mensaje_correcto = False
         return mensaje_correcto
 
 # Configuración del Application
 if __name__ == '__main__':
-    app = Application.builder().token(mi_bot_token).build()
-    text_handler = MessageHandler(filters.TEXT, analyze_message)
-    app.add_handler(text_handler)
+    app = Application.builder().token(token=mi_bot_token).build()
+    text_handler = MessageHandler(filters=filters.TEXT, callback=analyze_message)
+    app.add_handler(handler=text_handler)
     app.run_polling() # Es como el idle()
