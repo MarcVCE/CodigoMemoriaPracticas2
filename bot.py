@@ -13,6 +13,10 @@ from openai import OpenAI
 load_dotenv()
 mi_bot_token = os.getenv('BOT_TOKEN')
 mi_api_key = os.getenv('API_KEY_OPENAI')
+smtp_host = os.getenv('SMTP_HOST')
+smtp_port = os.getenv('SMTP_PORT')
+smtp_user = os.getenv('SMTP_USER')
+smtp_password = os.getenv('SMTP_PASSWORD')
 cliente = OpenAI(api_key=mi_api_key)
 mensaje_correcto = True
 
@@ -41,10 +45,6 @@ async def analyze_message(update: Update, context: CallbackContext) -> None:
         send_message(chat_id=chat_id, text="❌ Se ha producido un error")
 
 def send_email(email_user: str, message_text: str) -> None:
-    smtp_host = 'smtp-mail.outlook.com'
-    smtp_port = 587
-    smtp_user = "superasistenteia0012@outlook.es"
-    smtp_password = "1234567890W@#"
     message = MIMEMultipart()
     message["From"] = f"AIbot <{smtp_user}>"
     message["To"] = email_user
