@@ -18,11 +18,11 @@ smtp_port = os.getenv('SMTP_PORT')
 smtp_user = os.getenv('SMTP_USER')
 smtp_password = os.getenv('SMTP_PASSWORD')
 cliente = OpenAI(api_key=mi_api_key)
-mensaje_correcto = True
 
 # Carga el fichero JSON
 with open("functions.json", "r") as file:
     fichero_json = json.load(file)
+
 
 # Funciones
 def send_message(chat_id: int, text: str) -> None:
@@ -31,8 +31,10 @@ def send_message(chat_id: int, text: str) -> None:
     response = requests.post(url=url, data=data)
     if response.ok:
         print("Mensaje de telegram enviado correctamente")
+        return True
     else:
         print("Ha habido un error al enviar")
+        return False
 
 
 async def analyze_message(update: Update, context: CallbackContext) -> None:
@@ -44,12 +46,34 @@ async def analyze_message(update: Update, context: CallbackContext) -> None:
     else:
         send_message(chat_id=chat_id, text="❌ Se ha producido un error")
 
+
+def redactar_correo_con_ia(message_text: str) -> str:
+    # cliente.chat.completions.create => "Simulas que estás en chatgpt"
+    # y con el content, es el prompt/lo que le pondrías por texto 
+    # que le pondrías a realizar, y claro esto lo hacemos porque la idea
+    # es hacerlo desde código y no irte manualmente a chatgpt (que además
+    # no cumpliría los objetivos que queremos)
+    response = cliente.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{'role' : 'user', 
+                    'content' : (f'En base a este mensaje : {message_text} , devuelve en un objeto JSON que tenga' +
+                                  ' como claves asunto y correo, el contenido redactado para un correo electrónico' + 
+                                  ' y el asunto para el mismo.')}]
+    )
+
+    email_redactado_str = response.choices[0].message.content
+    email_redactado = json.loads(email_redactado_str)
+    return email_redactado
+
+    
+
 def send_email(email_user: str, message_text: str) -> None:
+    email_content = redactar_correo_con_ia(message_text=message_text)
     message = MIMEMultipart()
     message["From"] = f"AIbot <{smtp_user}>"
     message["To"] = email_user
-    message["Subject"] = "Ha recibido un nuevo mensaje"
-    body = message_text
+    message["Subject"] = email_content["asunto"]
+    body = email_content["correo"]
     message.attach(payload=MIMEText(body, "plain"))
     try:
         server = smtplib.SMTP(host=smtp_host, port=smtp_port)
@@ -65,8 +89,7 @@ def send_email(email_user: str, message_text: str) -> None:
         return False
 
 
-
-def choose_function(texto : str, chat_id : int) -> bool | None:
+def choose_function(texto : str) -> bool | None:
     response = cliente.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{'role' : 'user', 
@@ -83,13 +106,14 @@ def choose_function(texto : str, chat_id : int) -> bool | None:
             case "send_email":
                 success = send_email(email_user=parametros_funcion["email_user"] ,
                            message_text=parametros_funcion["message"])
-        return success
     else:
-        mensaje_correcto = False
-        return mensaje_correcto
+        success = False
+    
+    return success
 
 # Configuración del Application
 if __name__ == '__main__':
+    print("\nIniciando bot...")
     app = Application.builder().token(token=mi_bot_token).build()
     text_handler = MessageHandler(filters=filters.TEXT, callback=analyze_message)
     app.add_handler(handler=text_handler)
