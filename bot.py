@@ -40,7 +40,7 @@ def send_message(chat_id: int, text: str) -> None:
 async def analyze_message(update: Update, context: CallbackContext) -> None:
     texto_recibido = update.effective_message.text
     chat_id = update.effective_chat.id
-    success = choose_function(texto=texto_recibido, chat_id=chat_id)
+    success = choose_function(texto=texto_recibido)
     if success:
         send_message(chat_id=chat_id, text="✅ Mensaje enviado correctamente")
     else:
