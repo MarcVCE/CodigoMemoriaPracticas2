@@ -47,12 +47,14 @@ async def analyze_message(update: Update, context: CallbackContext) -> None:
         send_message(chat_id=chat_id, text="❌ Se ha producido un error")
 
 
-def redactar_correo_con_ia(message_text: str) -> str:
     # cliente.chat.completions.create => "Simulas que estás en chatgpt"
     # y con el content, es el prompt/lo que le pondrías por texto 
     # que le pondrías a realizar, y claro esto lo hacemos porque la idea
     # es hacerlo desde código y no irte manualmente a chatgpt (que además
     # no cumpliría los objetivos que queremos)
+    
+
+def redactar_correo_con_ia(message_text: str) -> str:
     response = cliente.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{'role' : 'user', 
@@ -67,7 +69,7 @@ def redactar_correo_con_ia(message_text: str) -> str:
 
     
 
-def send_email(email_user: str, message_text: str) -> None:
+def send_email(email_user: str, message_text: str) -> bool:
     email_content = redactar_correo_con_ia(message_text=message_text)
     message = MIMEMultipart()
     message["From"] = f"AIbot <{smtp_user}>"
@@ -111,10 +113,14 @@ def choose_function(texto : str) -> bool | None:
     
     return success
 
-# Configuración del Application
+
+
 if __name__ == '__main__':
     print("\nIniciando bot...")
     app = Application.builder().token(token=mi_bot_token).build()
     text_handler = MessageHandler(filters=filters.TEXT, callback=analyze_message)
     app.add_handler(handler=text_handler)
-    app.run_polling() # Es como el idle()
+    app.run_polling() 
+
+
+    
